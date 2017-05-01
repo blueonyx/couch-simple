@@ -21,7 +21,6 @@ import           Control.Monad.Reader (Reader, ask, runReader)
 import           Control.Monad.State  (StateT, execStateT, get, put)
 import           Data.Aeson           (ToJSON, encode)
 import           Data.ByteString      (ByteString, intercalate, null)
-import           Data.Default         (def)
 import           Data.Eq              ((==))
 import           Data.Function        (on, ($), (.))
 import           Data.List            (unionBy)
@@ -36,6 +35,7 @@ import           Network.HTTP.Client  (Request, RequestBody (RequestBodyLBS),
                                        applyBasicAuth, cookieJar, host, method,
                                        path, port, requestBody, requestHeaders,
                                        setQueryString)
+import qualified Network.HTTP.Client  as NHC (defaultRequest)
 import           Network.HTTP.Types   (RequestHeaders, hAccept, hContentType)
 
 -- | The state of our request as it's being built
@@ -60,7 +60,7 @@ type RequestBuilder = StateT BuilderState (Reader Context)
 -- | Given a 'Context', run our monadic builder function to produce a 'Request'.
 runBuilder :: RequestBuilder () -> Context -> Request
 runBuilder builder context =
-  finalize (runReader (execStateT (defaultRequest >> builder) (BuilderState def [] mempty [])) context)
+  finalize (runReader (execStateT (defaultRequest >> builder) (BuilderState NHC.defaultRequest [] mempty [])) context)
 
 -- | This actually takes the 'BuilderState' and does the assembly of the various state bits into a single 'Request'.
 finalize :: BuilderState -> Request

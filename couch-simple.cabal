@@ -1,12 +1,12 @@
 author:              Michael Alan Dorman
 bug-reports:         https://github.com/mdorman/couch-simple/issues
-build-type:          Custom
+build-type:          Simple
 cabal-version:       >= 1.10
 category:            Database
 copyright:           Copyright (c) 2015, Michael Alan Dorman
 description:         Based on http-client, with intended extensions for streaming through Conduit and other libraries.
-extra-source-files:  test/schema/schema/*.json
-                     *.txt
+extra-source-files:  *.txt
+                     --test/schema/schema/*.json
 homepage:            https://github.com/mdorman/couch-simple
 license-file:        LICENSE
 license:             MIT
@@ -14,7 +14,7 @@ maintainer:          mdorman@jaunder.io
 name:                couch-simple
 synopsis:            A modern, lightweight, complete client for CouchDB
 tested-with:         GHC == 7.8.4, GHC == 7.10.3, GHC == 8.0.1
-version:             0.0.1.1
+version:             0.0.1.2
 
 source-repository head
   type:     git
@@ -28,7 +28,7 @@ library
                , bytestring
                , data-default
                , exceptions
-               , http-client < 0.5
+               , http-client < 0.6
                , http-types
                , integer-gmp
                , mtl
@@ -66,9 +66,9 @@ test-suite test
                , directory
                , exceptions
                , filepath
-               , hjsonschema == 0.10.*
+               , hjsonschema 
                , hlint == 1.*
-               , http-client >= 0.4.30 && < 0.5
+               , http-client >= 0.5.6.1 && < 0.6
                , http-types
                , random
                , tasty

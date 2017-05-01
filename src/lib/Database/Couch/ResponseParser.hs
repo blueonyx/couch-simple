@@ -20,7 +20,7 @@ These relatively simple combinators can do simple extractions of data from the d
 module Database.Couch.ResponseParser where
 
 import           Control.Monad              (return, (>>=))
-import           Control.Monad.Reader       (Reader, asks, runReader)
+import           Control.Monad.Reader       (Reader, ask, asks, runReader)
 import           Control.Monad.Trans.Except (ExceptT, runExceptT, throwE)
 import           Data.Aeson                 (FromJSON, Result (Error, Success),
                                              Value (Object), fromJSON)
@@ -28,8 +28,8 @@ import           Data.ByteString            (ByteString)
 import           Data.Either                (Either (Left, Right), either)
 import           Data.Eq                    ((==))
 import           Data.Foldable              (find)
-import           Data.Function              (($), (.))
-import           Data.Functor               (fmap)
+import           Data.Function              (($), (.), const)
+import           Data.Functor               (fmap, (<$>))
 import           Data.HashMap.Strict        (lookup)
 import           Data.Maybe                 (Maybe, maybe)
 import           Data.Monoid                (mempty)
@@ -39,7 +39,9 @@ import           Data.Text.Read             (decimal)
 import           Data.Tuple                 (fst, snd)
 import           Database.Couch.Types       (DocRev (DocRev), Error (AlreadyExists, Conflict, HttpError, ImplementationError, InvalidName, NotFound, ParseFail, Unauthorized))
 import           GHC.Integer                (Integer)
-import           Network.HTTP.Client        (HttpException (StatusCodeException))
+import           Network.HTTP.Client        (HttpException (HttpExceptionRequest),
+                                             HttpExceptionContent (StatusCodeException), Response, responseBody, defaultRequest)
+import qualified Network.HTTP.Client        as NHC (responseStatus, responseHeaders)
 import           Network.HTTP.Types         (HeaderName, ResponseHeaders,
                                              Status, statusCode)
 
@@ -54,39 +56,38 @@ standardParse = do
 -- * Lower-level interfaces
 
 -- | A type synonym for the Monad we're operating in
-type ResponseParser = ExceptT Error (Reader (ResponseHeaders, Status, Value))
+type ResponseParser = ExceptT Error (Reader (Response Value))
 
 -- | Run a given parser over an initial value
-runParse :: ResponseParser a -> Either Error (ResponseHeaders, Status, Value) -> Either Error a
+runParse :: ResponseParser a -> Either Error (Response Value) -> Either Error a
 runParse p (Right v) = (runReader . runExceptT) p v
 runParse _ (Left v) = Left v
 
 -- | Extract the response status from the Monad
 responseStatus :: ResponseParser Status
 responseStatus =
-  asks status
-  where
-    status (_, s, _) = s
+  asks NHC.responseStatus
 
 -- | Extract the response headers from the Monad
 responseHeaders :: ResponseParser ResponseHeaders
 responseHeaders =
-  asks headers
-  where
-    headers (h, _, _) = h
+  asks NHC.responseHeaders
 
 -- | Extract the response value from the Monad
 responseValue :: ResponseParser Value
 responseValue =
-  asks value
-  where
-    value (_, _, v) = v
+  asks responseBody
+
+-- | Return the whole (Response Value)
+response :: ResponseParser (Response Value)
+response =
+  ask
 
 -- | Check the status code for the response
 checkStatusCode :: ResponseParser ()
 checkStatusCode = do
-  h <- responseHeaders
   s <- responseStatus
+  r <- response
   case statusCode s of
     200 -> return ()
     201 -> return ()
@@ -100,7 +101,8 @@ checkStatusCode = do
     409 -> throwE Conflict
     412 -> throwE AlreadyExists
     415 -> throwE $ ImplementationError "The server says we sent a bad content type, which shouldn't happen.  Please open an issue at https://github.com/mdorman/couch-simple/issues with a test case if possible."
-    _   -> throwE $ HttpError (StatusCodeException s h mempty)
+    _   -> throwE $ HttpError $ HttpExceptionRequest defaultRequest $
+                    StatusCodeException (const () <$> r) mempty
 
 -- | Try to retrieve a header from the response
 maybeGetHeader :: HeaderName -> ResponseParser (Maybe ByteString)

@@ -26,7 +26,7 @@ import           Data.Attoparsec.ByteString    (IResult (Done, Fail, Partial),
                                                 parseWith)
 import           Data.Either                   (Either (Right, Left), either)
 import           Data.Eq                       ((==))
-import           Data.Function                 (const, flip, ($), (.))
+import           Data.Function                 (flip, ($), (.))
 import           Data.Maybe                    (Maybe (Just, Nothing))
 import           Data.Monoid                   (mempty)
 import           Data.Text                     (pack)
@@ -35,13 +35,10 @@ import           Database.Couch.ResponseParser (ResponseParser, runParse,
                                                 standardParse)
 import           Database.Couch.Types          (Context, Error (HttpError, ParseFail, ParseIncomplete),
                                                 Result, ctxCookies, ctxManager)
-import           Network.HTTP.Client           (CookieJar, Manager, Request,
-                                                brRead, checkStatus, method,
-                                                responseBody, responseCookieJar,
-                                                responseHeaders, responseStatus,
-                                                withResponse)
-import           Network.HTTP.Types            (ResponseHeaders, Status,
-                                                methodHead)
+import           Network.HTTP.Client           (Manager, Request, Response,
+                                                brRead, method,
+                                                responseBody, responseCookieJar, withResponse)
+import           Network.HTTP.Types            (methodHead)
 
 {- | Make an HTTP request returning a JSON value
 
@@ -68,9 +65,9 @@ say, streaming interfaces.
 rawJsonRequest :: MonadIO m
                => Manager -- ^ The "Network.HTTP.Client.Manager" to use for the request
                -> Request -- ^ The actual request itself
-               -> m (Either Error (ResponseHeaders, Status, CookieJar, Value))
+               -> m (Either Error (Response Value)) -- (ResponseHeaders, Status, CookieJar, Value))
 rawJsonRequest manager request =
-  liftIO (handle errorHandler $ withResponse request { checkStatus = const . const . const Nothing } manager responseHandler)
+  liftIO (handle errorHandler $ withResponse request manager responseHandler)
   where
     -- Simply convert any exception into an HttpError
     errorHandler =
@@ -81,7 +78,7 @@ rawJsonRequest manager request =
                 then return (Done mempty Null)
                 else parseParts res
       return $ case result of
-        (Done _ ret) -> return (responseHeaders res, responseStatus res, responseCookieJar res, ret)
+        (Done _ ret) -> return $ res { responseBody = ret } -- (responseHeaders res, responseStatus res, responseCookieJar res, ret)
         (Partial _) -> Left ParseIncomplete
         (Fail _ _ err) -> Left $ ParseFail $ pack err
     parseParts res = do
@@ -117,8 +114,8 @@ structureRequest builder parse context =
       runBuilder builder context
     parser =
       return . either Left parseContext
-    parseContext (h, s, c, v) =
-      runParse parse (Right (h, s, v)) >>= checkContextUpdate c
+    parseContext resp =
+      runParse parse (Right resp) >>= checkContextUpdate (responseCookieJar resp)
     checkContextUpdate c a =
       Right (a, if c == ctxCookies context then Nothing else Just c)
 
