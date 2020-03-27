@@ -4,7 +4,6 @@
 {-# LANGUAGE TupleSections     #-}
 
 {- |
-
 Module      : Database.Couch.ResponseParser
 Description : Code for parsing responses from Database.Couch.External
 Copyright   : Copyright (c) 2015, Michael Alan Dorman
@@ -12,15 +11,13 @@ License     : MIT
 Maintainer  : mdorman@jaunder.io
 Stability   : experimental
 Portability : POSIX
-
 These relatively simple combinators can do simple extractions of data from the data returned by "Database.Couch.External" routines, as well as checking certain information about the actual response values.
-
 -}
 
 module Database.Couch.ResponseParser where
 
 import           Control.Monad              (return, (>>=))
-import           Control.Monad.Reader       (Reader, ask, asks, runReader)
+import           Control.Monad.Reader       (Reader, asks, runReader)
 import           Control.Monad.Trans.Except (ExceptT, runExceptT, throwE)
 import           Data.Aeson                 (FromJSON, Result (Error, Success),
                                              Value (Object), fromJSON)
@@ -28,8 +25,8 @@ import           Data.ByteString            (ByteString)
 import           Data.Either                (Either (Left, Right), either)
 import           Data.Eq                    ((==))
 import           Data.Foldable              (find)
-import           Data.Function              (($), (.), const)
-import           Data.Functor               (fmap, (<$>))
+import           Data.Function              (($), (.))
+import           Data.Functor               (fmap)
 import           Data.HashMap.Strict        (lookup)
 import           Data.Maybe                 (Maybe, maybe)
 import           Data.Text                  (Text, pack)
@@ -52,38 +49,38 @@ standardParse = do
 -- * Lower-level interfaces
 
 -- | A type synonym for the Monad we're operating in
-type ResponseParser = ExceptT Error (Reader (Response Value))
+type ResponseParser = ExceptT Error (Reader (ResponseHeaders, Status, Value))
 
 -- | Run a given parser over an initial value
-runParse :: ResponseParser a -> Either Error (Response Value) -> Either Error a
+runParse :: ResponseParser a -> Either Error (ResponseHeaders, Status, Value) -> Either Error a
 runParse p (Right v) = (runReader . runExceptT) p v
 runParse _ (Left v) = Left v
 
 -- | Extract the response status from the Monad
 responseStatus :: ResponseParser Status
 responseStatus =
-  asks NHC.responseStatus
+  asks status
+  where
+    status (_, s, _) = s
 
 -- | Extract the response headers from the Monad
 responseHeaders :: ResponseParser ResponseHeaders
 responseHeaders =
-  asks NHC.responseHeaders
+  asks headers
+  where
+    headers (h, _, _) = h
 
 -- | Extract the response value from the Monad
 responseValue :: ResponseParser Value
 responseValue =
-  asks responseBody
-
--- | Return the whole (Response Value)
-response :: ResponseParser (Response Value)
-response =
-  ask
+  asks value
+  where
+    value (_, _, v) = v
 
 -- | Check the status code for the response
 checkStatusCode :: ResponseParser ()
 checkStatusCode = do
   s <- responseStatus
-  r <- response
   case statusCode s of
     200 -> return ()
     201 -> return ()
