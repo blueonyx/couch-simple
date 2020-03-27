@@ -33,12 +33,15 @@ import           Data.Text                     (pack)
 import           Database.Couch.RequestBuilder (RequestBuilder, runBuilder)
 import           Database.Couch.ResponseParser (ResponseParser, runParse,
                                                 standardParse)
-import           Database.Couch.Types          (Context, Error (HttpError, ParseFail, ParseIncomplete),
+import           Database.Couch.Types          (Context, Error (Unknown, ParseFail, ParseIncomplete),
                                                 Result, ctxCookies, ctxManager)
-import           Network.HTTP.Client           (Manager, Request, Response,
+import           Network.HTTP.Client           (CookieJar, Manager, Request,
                                                 brRead, method,
-                                                responseBody, responseCookieJar, withResponse)
-import           Network.HTTP.Types            (methodHead)
+                                                responseBody, responseCookieJar,
+                                                responseHeaders, responseStatus,
+                                                withResponse)
+import           Network.HTTP.Types            (ResponseHeaders, Status,
+                                                methodHead)
 
 {- | Make an HTTP request returning a JSON value
 
@@ -67,11 +70,8 @@ rawJsonRequest :: MonadIO m
                -> Request -- ^ The actual request itself
                -> m (Either Error (Response Value)) -- (ResponseHeaders, Status, CookieJar, Value))
 rawJsonRequest manager request =
-  liftIO (handle errorHandler $ withResponse request manager responseHandler)
+  liftIO (withResponse request manager responseHandler)
   where
-    -- Simply convert any exception into an HttpError
-    errorHandler =
-       return . Left . HttpError
     -- Incrementally parse the body, reporting failures.
     responseHandler res = do
       result <- if method request == methodHead
