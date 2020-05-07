@@ -71,7 +71,7 @@ newtype Host = Host { unwrapHost :: Text } deriving (Eq, FromJSON, IsString, Sho
 newtype Password = Password { unwrapPassword :: Text } deriving (Eq, FromJSON, IsString, Show, ToJSON)
 
 -- | A TCP port number
-newtype Port = Port { unwrapPort :: Int } deriving (Eq, Show)
+newtype Port = Port { unwrapPort :: Int } deriving (Eq, Show, FromJSON, ToJSON)
 
 -- | The name of a user
 newtype User = User { unwrapUser ::  Text } deriving (Eq, FromJSON, IsString, Show, ToJSON)
