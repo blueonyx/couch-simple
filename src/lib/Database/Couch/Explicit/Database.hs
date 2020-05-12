@@ -24,7 +24,7 @@ module Database.Couch.Explicit.Database where
 
 import           Control.Monad                 (return, when)
 import           Control.Monad.IO.Class        (MonadIO)
-import           Control.Monad.Trans.Except    (throwE)
+import           Control.Monad.Except          (throwError)
 import           Data.Aeson                    (FromJSON, ToJSON,
                                                 Value (Object), object, toJSON)
 import           Data.Bool                     (Bool (True))
@@ -73,8 +73,8 @@ exists =
       s <- responseStatus
       case statusCode s of
         200 -> toOutputType $ object [("ok", toJSON True)]
-        404 -> throwE NotFound
-        _   -> throwE Unknown
+        404 -> throwError NotFound
+        _   -> throwError Unknown
 
 {- | <http://docs.couchdb.org/en/1.6.1/api/database/common.html#get--db Get most basic meta-information>
 

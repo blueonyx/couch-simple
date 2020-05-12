@@ -27,13 +27,11 @@ library
                , bifunctors
                , bytestring
                , data-default
-               , exceptions
                , http-client < 0.7
                , http-types
                , integer-gmp
                , mtl
                , text
-               , transformers >= 0.4
                , unordered-containers
                , uuid
                , vector

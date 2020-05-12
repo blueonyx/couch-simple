@@ -16,27 +16,27 @@ These relatively simple combinators can do simple extractions of data from the d
 
 module Database.Couch.ResponseParser where
 
-import           Control.Monad              (return, (>>=))
-import           Control.Monad.Reader       (Reader, asks, runReader)
-import           Control.Monad.Trans.Except (ExceptT, runExceptT, throwE)
-import           Data.Aeson                 (FromJSON, Result (Error, Success),
-                                             Value (Object), fromJSON)
-import           Data.ByteString            (ByteString)
-import           Data.Either                (Either (Left, Right), either)
-import           Data.Eq                    ((==))
-import           Data.Foldable              (find)
-import           Data.Function              (($), (.))
-import           Data.Functor               (fmap)
-import           Data.HashMap.Strict        (lookup)
-import           Data.Maybe                 (Maybe, maybe)
-import           Data.Text                  (Text, pack)
-import           Data.Text.Encoding         (decodeUtf8)
-import           Data.Text.Read             (decimal)
-import           Data.Tuple                 (fst, snd)
-import           Database.Couch.Types       (DocRev (DocRev), Error (AlreadyExists, Conflict, HttpError, ImplementationError, InvalidName, NotFound, ParseFail, Unauthorized))
-import           GHC.Integer                (Integer)
-import           Network.HTTP.Types         (HeaderName, ResponseHeaders,
-                                             Status, statusCode)
+import           Control.Monad        (return, (>>=))
+import           Control.Monad.Reader (Reader, asks, runReader)
+import           Control.Monad.Except (ExceptT, runExceptT, throwError)
+import           Data.Aeson           (FromJSON, Result (Error, Success),
+                                       Value (Object), fromJSON)
+import           Data.ByteString      (ByteString)
+import           Data.Either          (Either (Left, Right), either)
+import           Data.Eq              ((==))
+import           Data.Foldable        (find)
+import           Data.Function        (($), (.))
+import           Data.Functor         (fmap)
+import           Data.HashMap.Strict  (lookup)
+import           Data.Maybe           (Maybe, maybe)
+import           Data.Text            (Text, pack)
+import           Data.Text.Encoding   (decodeUtf8)
+import           Data.Text.Read       (decimal)
+import           Data.Tuple           (fst, snd)
+import           Database.Couch.Types (DocRev (DocRev), Error (AlreadyExists, Conflict, HttpError, ImplementationError, InvalidName, NotFound, ParseFail, Unauthorized))
+import           GHC.Integer          (Integer)
+import           Network.HTTP.Types   (HeaderName, ResponseHeaders,
+                                       Status, statusCode)
 
 -- * Our primary interface
 
@@ -88,13 +88,13 @@ checkStatusCode = do
     304 -> return ()
     400 -> do
       error <- getKey "reason" >>= toOutputType
-      throwE $ InvalidName error
-    401 -> throwE Unauthorized
-    404 -> throwE NotFound
-    409 -> throwE Conflict
-    412 -> throwE AlreadyExists
-    415 -> throwE $ ImplementationError "The server says we sent a bad content type, which shouldn't happen.  Please open an issue at https://github.com/mdorman/couch-simple/issues with a test case if possible."
-    _   -> throwE $ HttpError s
+      throwError $ InvalidName error
+    401 -> throwError Unauthorized
+    404 -> throwError NotFound
+    409 -> throwError Conflict
+    412 -> throwError AlreadyExists
+    415 -> throwError $ ImplementationError "The server says we sent a bad content type, which shouldn't happen.  Please open an issue at https://github.com/mdorman/couch-simple/issues with a test case if possible."
+    _   -> throwError $ HttpError s
 
 -- | Try to retrieve a header from the response
 maybeGetHeader :: HeaderName -> ResponseParser (Maybe ByteString)
@@ -105,13 +105,13 @@ maybeGetHeader header = do
 -- | Retrieve a header from the response, or return an error if it's not present
 getHeader :: HeaderName -> ResponseParser ByteString
 getHeader header =
-  maybeGetHeader header >>= maybe (throwE NotFound) return
+  maybeGetHeader header >>= maybe (throwError NotFound) return
 
 -- | Decode the Content-Length header from the response, or return an error if it's not present
 getContentLength :: ResponseParser Integer
 getContentLength = do
   h <- getHeader "Content-Length"
-  either (throwE . ParseFail . pack) (return . fst) $ decimal (decodeUtf8 h)
+  either (throwError . ParseFail . pack) (return . fst) $ decimal (decodeUtf8 h)
 
 -- | Get the document revision (ETag header), or return an error if it's not present
 getDocRev :: ResponseParser DocRev
@@ -124,12 +124,12 @@ getKey :: Text -> ResponseParser Value
 getKey key = do
   v <- responseValue
   case v of
-    Object o -> maybe (throwE NotFound) return $ lookup key o
-    _        -> throwE NotFound
+    Object o -> maybe (throwError NotFound) return $ lookup key o
+    _        -> throwError NotFound
 
 -- | Decode the response value to a particular type, or return an error if it can't be decoded
 toOutputType :: (FromJSON a) => Value -> ResponseParser a
 toOutputType v =
   case fromJSON v of
-    Error e -> throwE $ ParseFail $ pack e
+    Error e -> throwError $ ParseFail $ pack e
     Success a -> return a
